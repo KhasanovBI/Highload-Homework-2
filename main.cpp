@@ -1,8 +1,8 @@
-#include <cstdint>
 #include <ctime>
 #include <iostream>
 #include <algorithm>
 #include <fstream>
+#include <vector>
 
 using namespace std;
 #define CACHE_CLEAR_LIST_SIZE (8 * 1024 * 1024)
@@ -30,11 +30,11 @@ void directAccessMeasurement(size_t initialListSize, size_t maxListSize) {
     ofstream resultsFile;
     resultsFile.open("directAccessCacheMeasuring.csv");
     volatile void **testList = new volatile void *[maxListSize];
-    for (double step = initialListSize; step < maxListSize; step *= 1.15) {
+    for (size_t step = initialListSize; step < maxListSize; step += 10240) {
         double measuredTime = 0;
-        size_t DIRECT_ACCESS_ITERATIONS_COUNT = (size_t) floor(step / initialListSize * 100);
+        size_t DIRECT_ACCESS_ITERATIONS_COUNT = step / initialListSize * 100;
         for (size_t j = 0; j < DIRECT_ACCESS_ITERATIONS_COUNT; ++j) {
-            prepareDirectList(testList, maxListSize, (const size_t) floor(step));
+            prepareDirectList(testList, maxListSize, step);
             clock_t start = clock();
             volatile void **currentPosition = testList;
             for (size_t i = 0; i < maxListSize; i += step) {
@@ -43,7 +43,7 @@ void directAccessMeasurement(size_t initialListSize, size_t maxListSize) {
             clock_t stop = clock();
             measuredTime += (stop - start);
         }
-        measuredTime /= (DIRECT_ACCESS_ITERATIONS_COUNT * maxListSize / step);
+        measuredTime /= DIRECT_ACCESS_ITERATIONS_COUNT * (maxListSize / step + (maxListSize % step > 0 ? 1 : 0));
         cout << "Step size: " << step * sizeof(void *) / 1024 << "Kb, Time: " << measuredTime << endl;
         resultsFile << step * sizeof(void *) / 1024 << ',' << measuredTime << endl;
     }
@@ -52,7 +52,7 @@ void directAccessMeasurement(size_t initialListSize, size_t maxListSize) {
 }
 
 
-void prepareRandomList(volatile void **testList, const size_t testListSize) {
+void prepareRandomList(volatile char **testList, const size_t testListSize) {
     vector<size_t> randomHelper;
     randomHelper.reserve(testListSize);
     for (size_t i = 0; i < testListSize; ++i) {
@@ -60,19 +60,19 @@ void prepareRandomList(volatile void **testList, const size_t testListSize) {
     }
     random_shuffle(randomHelper.begin(), randomHelper.end());
     for (size_t i = 0; i < testListSize; ++i) {
-        testList[i] = (void *) (testList + randomHelper[i]);
+        testList[i] = (char *) (testList + randomHelper[i]);
     }
     clearCache();
 }
 
-double measureRandomAccess(volatile void **testList, const size_t testListSize) {
+double measureRandomAccess(volatile char **testList, const size_t testListSize) {
     double averageTime = 0;
     for (size_t j = 0; j < RANDOM_ACCESS_ITERATIONS_COUNT; ++j) {
         prepareRandomList(testList, testListSize);
         clock_t start = clock();
-        volatile void **currentPosition = testList;
+        volatile char **currentPosition = testList;
         for (size_t i = 0; i < testListSize; ++i) {
-            currentPosition = (volatile void **) *currentPosition;
+            currentPosition = (volatile char **) *currentPosition;
         }
         clock_t stop = clock();
         averageTime += (stop - start);
@@ -86,7 +86,7 @@ void randomAccessMeasurement(size_t initialListSize, size_t maxListSize) {
     ofstream resultsFile;
     resultsFile.open("randomAccessCacheMeasuring.csv");
     for (size_t testListSize = initialListSize; testListSize <= maxListSize; testListSize *= 1.15) {
-        volatile void **testList = new volatile void *[testListSize];
+        volatile char **testList = new volatile char *[testListSize];
         double measuredTime = measureRandomAccess(testList, testListSize);
         cout << "List size: " << double(testListSize) * sizeof(void *) / 1024 << "Kb, Time: " << measuredTime << endl;
         resultsFile << double(testListSize) * sizeof(void *) / 1024 << ',' << measuredTime << endl;
@@ -102,7 +102,6 @@ int main(int argc, char *argv[]) {
     size_t maxListSize = maxListMemorySize / sizeof(void *);
     randomAccessMeasurement(initialListSize, maxListSize);
     directAccessMeasurement(initialListSize, maxListSize);
-
     system("./plot.py &");
     return 0;
 }
