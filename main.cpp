@@ -74,13 +74,13 @@ void prepareRandomList(testType *testList, const size_t testListSize) {
 double measure(testType *testList) {
     testType *currentPosition = testList;
     double averageTime = 0;
-    for (int count = 0; count < CYCLES; count++) {
-        clock_t start = clock();
+    clock_t start = clock();
+    for (int count = 0; count < CYCLES; ++count) {
         THOUSAND(currentPosition = currentPosition->next;)
-        clock_t stop = clock();
-        averageTime += stop - start;
     }
-    return averageTime / 1000 / CYCLES;
+    clock_t stop = clock();
+    averageTime = double (stop - start) / CYCLES / CLOCKS_PER_SEC;
+    return averageTime;
 }
 
 void measurement(TestParams &testParams) {
@@ -88,7 +88,7 @@ void measurement(TestParams &testParams) {
     ofstream resultsFile;
     resultsFile.open(testParams.resultsFileName);
     for (size_t testListSize = testParams.initialListSize;
-         testListSize <= testParams.maxListSize; testListSize = (size_t) ceil(1.1 * testListSize)) {
+         testListSize <= testParams.maxListSize; testListSize = (size_t) ceil(1.2 * testListSize)) {
         testType *testList = new testType[testListSize];
         testParams.prepareList(testList, testListSize);
         double measuredTime = measure(testList);
@@ -102,7 +102,7 @@ void measurement(TestParams &testParams) {
 int main(int argc, char *argv[]) {
     cout << "Struct size: " << sizeof(testType) << endl;
     size_t initialListMemorySize = 1024;
-    size_t maxListMemorySize = 8 * 1024 * initialListMemorySize;
+    size_t maxListMemorySize = 16 * 1024 * initialListMemorySize;
     size_t initialListSize = initialListMemorySize / sizeof(testType);// size - number of elements, not memory size
     size_t maxListSize = maxListMemorySize / sizeof(testType);
 
