@@ -13,12 +13,13 @@
 #define FIVE_HUNDRED(x) HUNDRED(x) HUNDRED(x) HUNDRED(x) HUNDRED(x) HUNDRED(x)
 #define THOUSAND(x) FIVE_HUNDRED(x) FIVE_HUNDRED(x)
 #define CACHE_CLEAR_LIST_SIZE (8 * 1024 * 1024)
-#define CYCLES 1000
+#define CYCLES 10000
 
 using namespace std;
 
 struct Pointer {
     struct Pointer *next;
+    long int pad[31];
 };
 
 typedef Pointer testType;
@@ -87,30 +88,23 @@ void measurement(TestParams &testParams) {
     ofstream resultsFile;
     resultsFile.open(testParams.resultsFileName);
     for (size_t testListSize = testParams.initialListSize;
-         testListSize <= testParams.maxListSize; testListSize *= 1.1) {
+         testListSize <= testParams.maxListSize; testListSize = (size_t) ceil(1.1 * testListSize)) {
         testType *testList = new testType[testListSize];
         testParams.prepareList(testList, testListSize);
         double measuredTime = measure(testList);
-        cout << "List size: " << double(testListSize) * sizeof(testType *) / 1024 << "Kb, Time: " << measuredTime <<
-        endl;
-        resultsFile << double(testListSize) * sizeof(testType *) / 1024 << ',' << measuredTime << endl;
+        cout << "List size: " << double(testListSize) * sizeof(testType) / 1024 << "Kb, Time: " << measuredTime << endl;
+        resultsFile << double(testListSize) * sizeof(testType) / 1024 << ',' << measuredTime << endl;
         delete[] testList;
     }
     resultsFile.close();
 }
 
 int main(int argc, char *argv[]) {
+    cout << "Struct size: " << sizeof(testType) << endl;
     size_t initialListMemorySize = 1024;
     size_t maxListMemorySize = 8 * 1024 * initialListMemorySize;
-    size_t initialListSize = initialListMemorySize / sizeof(testType *);// size - number of elements, not memory size
-    size_t maxListSize = maxListMemorySize / sizeof(testType *);
-
-    TestParams randomAccessParams;
-    randomAccessParams.testName = "Random access";
-    randomAccessParams.initialListSize = initialListSize;
-    randomAccessParams.maxListSize = maxListSize;
-    randomAccessParams.prepareList = prepareRandomList;
-    randomAccessParams.resultsFileName = "randomAccessCacheMeasuring.csv";
+    size_t initialListSize = initialListMemorySize / sizeof(testType);// size - number of elements, not memory size
+    size_t maxListSize = maxListMemorySize / sizeof(testType);
 
     TestParams sequentialAccessParams;
     sequentialAccessParams.testName = "Sequential access";
@@ -119,8 +113,15 @@ int main(int argc, char *argv[]) {
     sequentialAccessParams.prepareList = prepareSequentialList;
     sequentialAccessParams.resultsFileName = "sequentialAccessCacheMeasuring.csv";
 
-    measurement(randomAccessParams);
+    TestParams randomAccessParams;
+    randomAccessParams.testName = "Random access";
+    randomAccessParams.initialListSize = initialListSize;
+    randomAccessParams.maxListSize = maxListSize;
+    randomAccessParams.prepareList = prepareRandomList;
+    randomAccessParams.resultsFileName = "randomAccessCacheMeasuring.csv";
+
     measurement(sequentialAccessParams);
+    measurement(randomAccessParams);
     system("./plot.py &");
     return 0;
 }
